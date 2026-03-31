@@ -25,10 +25,9 @@ export default function LoginScreen() {
     router.replace('/(tabs)');
   };
  
-  /*const handleCreateAccount = () => {
-    // TODO: navegar a pantalla de registro
+  const handleCreateAccount = () => {
     router.push('/auth/register');
-  };*/
+  };
  
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -105,7 +104,7 @@ export default function LoginScreen() {
             {/* Crear cuenta */}
             <TouchableOpacity
               style={styles.createAccountButton}
-              //onPress={handleCreateAccount}
+              onPress={handleCreateAccount}
               activeOpacity={0.7}
             >
               <Text style={styles.createAccountText}>Crear Cuenta Nueva</Text>
