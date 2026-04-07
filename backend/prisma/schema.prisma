@@ -1,0 +1,77 @@
+// ─── Configuración ────────────────────────────────────────────────────────────
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Modelos ──────────────────────────────────────────────────────────────────
+
+/// Usuarios registrados en SmartRewards
+model Usuario {
+  id           Int            @id @default(autoincrement())
+  nombre       String         @db.VarChar(100)
+  apellido     String         @db.VarChar(100)
+  email        String         @unique @db.VarChar(255)
+  telefono     String         @db.VarChar(20)
+  password     String         @db.VarChar(255)  // hash bcrypt
+  puntos       Int            @default(0)
+  creadoEn     DateTime       @default(now())   @map("creado_en")
+  actualizadoEn DateTime      @updatedAt        @map("actualizado_en")
+
+  transacciones Transaccion[]
+
+  @@map("usuarios")
+}
+
+/// Registro de cada vez que un usuario canjea o acumula puntos
+model Transaccion {
+  id            Int              @id @default(autoincrement())
+  usuarioId     Int              @map("usuario_id")
+  codigoQr      String           @db.VarChar(100)  @map("codigo_qr")
+  puntosGanados Int              @map("puntos_ganados")
+  tipo          TipoTransaccion
+  creadoEn      DateTime         @default(now())   @map("creado_en")
+
+  usuario       Usuario          @relation(fields: [usuarioId], references: [id])
+
+  @@map("transacciones")
+}
+
+/// Promociones que aparecen en la pantalla de Ofertas
+model Promocion {
+  id             Int       @id @default(autoincrement())
+  titulo         String    @db.VarChar(255)
+  descripcion    String    @db.Text
+  imagenUrl      String    @db.VarChar(500)  @map("imagen_url")
+  descuentoLabel String    @db.VarChar(50)   @map("descuento_label")
+  activa         Boolean   @default(true)
+  fechaFin       DateTime? @map("fecha_fin")
+  creadoEn       DateTime  @default(now())   @map("creado_en")
+
+  @@map("promociones")
+}
+
+/// Sucursales Smartgas que aparecen en el mapa y la lista
+model Sucursal {
+  id        Int      @id @default(autoincrement())
+  nombre    String   @db.VarChar(255)
+  direccion String   @db.VarChar(500)
+  lat       Decimal  @db.Decimal(10, 7)
+  lng       Decimal  @db.Decimal(10, 7)
+  servicios Json                          // ej: ["Combustible Premium","Lavado"]
+  activa    Boolean  @default(true)
+  creadoEn  DateTime @default(now())      @map("creado_en")
+
+  @@map("sucursales")
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum TipoTransaccion {
+  ACUMULACION   // el usuario carga gasolina y gana puntos
+  CANJE         // el usuario usa sus puntos en una promoción
+}

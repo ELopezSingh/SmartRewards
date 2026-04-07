@@ -1,35 +1,99 @@
 import { Tabs } from 'expo-router';
-import React from 'react';
-
-import { HapticTab } from '@/components/haptic-tab';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-
+import { Platform } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { Colors, FontSize, FontWeight } from '@/constants/theme';
+ 
+/**
+ * Bottom Navigation de SmartRewards
+ * Tabs: Inicio · Ofertas · Ubicaciones · Perfil
+ *
+ * Adaptado del BottomNavigation.tsx de Figma Make:
+ *   - lucide-react → @expo/vector-icons (Ionicons)
+ *   - div/button   → Expo Router <Tabs> (maneja estado activo automáticamente)
+ *   - fixed bottom → tabBar nativo de iOS/Android
+ */
+ 
+type IoniconsName = keyof typeof Ionicons.glyphMap;
+ 
+interface TabConfig {
+  name: string;
+  title: string;
+  icon: IoniconsName;
+  iconActive: IoniconsName;
+}
+ 
+const TABS: TabConfig[] = [
+  {
+    name: 'index',
+    title: 'Inicio',
+    icon: 'home-outline',
+    iconActive: 'home',
+  },
+  {
+    name: 'promotions',
+    title: 'Ofertas',
+    icon: 'pricetag-outline',
+    iconActive: 'pricetag',
+  },
+  {
+    name: 'locations',
+    title: 'Ubicaciones',
+    icon: 'location-outline',
+    iconActive: 'location',
+  },
+  {
+    name: 'profile',
+    title: 'Perfil',
+    icon: 'person-outline',
+    iconActive: 'person',
+  },
+];
+ 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
-
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
         headerShown: false,
-        tabBarButton: HapticTab,
-      }}>
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: 'Home',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="explore"
-        options={{
-          title: 'Explore',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="paperplane.fill" color={color} />,
-        }}
-      />
+ 
+        // ── Tab Bar ─────────────────────────────────────────
+        tabBarStyle: {
+          backgroundColor: Colors.white,
+          borderTopColor: Colors.navyOpacity10,
+          borderTopWidth: 1,
+          height: Platform.OS === 'ios' ? 84 : 64,
+          paddingTop: 8,
+          paddingBottom: Platform.OS === 'ios' ? 28 : 10,
+        },
+ 
+        // ── Colores ─────────────────────────────────────────
+        tabBarActiveTintColor: Colors.yellow,
+        tabBarInactiveTintColor: Colors.navyOpacity70,
+ 
+        // ── Etiqueta ─────────────────────────────────────────
+        tabBarLabelStyle: {
+          fontSize: FontSize.xs,
+          fontWeight: FontWeight.medium,
+          marginTop: 2,
+        },
+      }}
+    >
+      {TABS.map(tab => (
+        <Tabs.Screen
+          key={tab.name}
+          name={tab.name}
+          options={{
+            title: tab.title,
+            tabBarIcon: ({ focused, color }) => (
+              <Ionicons
+                name={focused ? tab.iconActive : tab.icon}
+                size={24}
+                color={color}
+              />
+            ),
+          }}
+        />
+      ))}
     </Tabs>
   );
 }
+ 
