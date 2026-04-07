@@ -4,6 +4,10 @@ import dotenv from 'dotenv';
 
 // Rutas (las iremos creando una a una)
 import authRoutes from './routes/auth';
+import usuariosRoutes from './routes/usuarios'
+import transaccionesRoutes from './routes/transacciones'
+import promocionesRoutes from './routes/promociones'
+import sucursalesRoutes from './routes/sucursales'
 
 dotenv.config();
 
@@ -16,10 +20,10 @@ app.use(express.json());
 
 // ── Rutas ─────────────────────────────────────────────────────────────────────
 app.use('/api/auth', authRoutes);
-// app.use('/api/usuarios',      usuariosRoutes);     // próximamente
-// app.use('/api/transacciones', transaccionesRoutes); // próximamente
-// app.use('/api/promociones',   promocionesRoutes);   // próximamente
-// app.use('/api/sucursales',    sucursalesRoutes);    // próximamente
+app.use('/api/usuarios', usuariosRoutes);
+app.use('/api/transacciones', transaccionesRoutes);
+app.use('/api/promociones', promocionesRoutes);
+app.use('/api/sucursales', sucursalesRoutes);
 
 // ── Health check ──────────────────────────────────────────────────────────────
 app.get('/health', (_req, res) => {
