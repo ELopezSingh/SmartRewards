@@ -9,26 +9,47 @@ import {
   KeyboardAvoidingView,
   Platform,
   StatusBar,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { Colors, FontSize, FontWeight, Radius, Spacing } from '@/constants/theme';
- 
+import { login } from '@/api/auth';
+
 export default function LoginScreen() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
- 
-  const handleLogin = () => {
-    // TODO: conectar con el backend de autenticación
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleLogin = async () => {
+    if (!email.trim() || !password.trim()) {
+      setError('Por favor ingresa tu correo y contraseña');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    const { usuario, error: apiError } = await login(email.trim(), password);
+
+    setLoading(false);
+
+    if (apiError) {
+      setError(apiError);
+      return;
+    }
+
+    // Login exitoso → navegar al home sin poder regresar al login
     router.replace('/(tabs)');
   };
- 
+
   const handleCreateAccount = () => {
     router.push('/auth/register');
   };
- 
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" backgroundColor={Colors.white} />
@@ -37,46 +58,56 @@ export default function LoginScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <View style={styles.container}>
- 
+
           {/* ── Logo ─────────────────────────────────────────── */}
           <View style={styles.logoContainer}>
             <Text style={styles.logoTitle}>SmartRewards</Text>
             <Text style={styles.logoSubtitle}>por Smartgas</Text>
           </View>
- 
+
           {/* ── Formulario ───────────────────────────────────── */}
           <View style={styles.form}>
- 
+
+            {/* Banner de error de API */}
+            {error && (
+              <View style={styles.errorBanner}>
+                <Ionicons name="alert-circle-outline" size={18} color={Colors.destructive} />
+                <Text style={styles.errorBannerText}>{error}</Text>
+              </View>
+            )}
+
             {/* Email */}
             <View style={styles.fieldContainer}>
               <Text style={styles.label}>Correo Electrónico</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, error ? styles.inputError : null]}
                 value={email}
-                onChangeText={setEmail}
+                onChangeText={v => { setEmail(v); setError(null); }}
                 placeholder="tu.correo@ejemplo.com"
                 placeholderTextColor={Colors.mutedForeground}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoCorrect={false}
                 returnKeyType="next"
+                editable={!loading}
               />
             </View>
- 
+
             {/* Contraseña */}
             <View style={styles.fieldContainer}>
               <Text style={styles.label}>Contraseña</Text>
               <View style={styles.passwordContainer}>
                 <TextInput
-                  style={[styles.input, styles.passwordInput]}
+                  style={[styles.input, styles.passwordInput, error ? styles.inputError : null]}
                   value={password}
-                  onChangeText={setPassword}
+                  onChangeText={v => { setPassword(v); setError(null); }}
                   placeholder="••••••••"
                   placeholderTextColor={Colors.mutedForeground}
                   secureTextEntry={!showPassword}
                   autoCapitalize="none"
                   returnKeyType="done"
                   onSubmitEditing={handleLogin}
+                  editable={!loading}
                 />
                 <TouchableOpacity
                   style={styles.eyeButton}
@@ -91,32 +122,38 @@ export default function LoginScreen() {
                 </TouchableOpacity>
               </View>
             </View>
- 
+
             {/* Botón Iniciar Sesión */}
             <TouchableOpacity
-              style={styles.loginButton}
+              style={[styles.loginButton, loading && styles.loginButtonDisabled]}
               onPress={handleLogin}
               activeOpacity={0.85}
+              disabled={loading}
             >
-              <Text style={styles.loginButtonText}>Iniciar Sesión</Text>
+              {loading ? (
+                <ActivityIndicator size="small" color={Colors.navy} />
+              ) : (
+                <Text style={styles.loginButtonText}>Iniciar Sesión</Text>
+              )}
             </TouchableOpacity>
- 
+
             {/* Crear cuenta */}
             <TouchableOpacity
               style={styles.createAccountButton}
               onPress={handleCreateAccount}
               activeOpacity={0.7}
+              disabled={loading}
             >
               <Text style={styles.createAccountText}>Crear Cuenta Nueva</Text>
             </TouchableOpacity>
- 
+
           </View>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
- 
+
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
@@ -131,7 +168,7 @@ const styles = StyleSheet.create({
     paddingTop: Spacing['7xl'],
     alignItems: 'center',
   },
- 
+
   // ── Logo ──────────────────────────────────────────────
   logoContainer: {
     marginBottom: Spacing['6xl'],
@@ -148,7 +185,7 @@ const styles = StyleSheet.create({
     color: Colors.navyOpacity70,
     marginTop: Spacing.xs,
   },
- 
+
   // ── Formulario ────────────────────────────────────────
   form: {
     width: '100%',
@@ -174,13 +211,32 @@ const styles = StyleSheet.create({
     fontWeight: FontWeight.normal,
     backgroundColor: Colors.white,
   },
- 
+  inputError: {
+    borderColor: Colors.destructive,
+  },
+
+  // ── Banner de error ───────────────────────────────────
+  errorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    padding: Spacing.md,
+    borderRadius: Radius.md,
+    backgroundColor: '#FEE2E2',
+  },
+  errorBannerText: {
+    flex: 1,
+    fontSize: FontSize.sm,
+    color: Colors.destructive,
+    fontWeight: FontWeight.medium,
+  },
+
   // ── Contraseña ────────────────────────────────────────
   passwordContainer: {
     position: 'relative',
   },
   passwordInput: {
-    paddingRight: Spacing['5xl'],  // espacio para el ojo
+    paddingRight: Spacing['5xl'],
   },
   eyeButton: {
     position: 'absolute',
@@ -190,7 +246,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: Spacing.xs,
   },
- 
+
   // ── Botones ───────────────────────────────────────────
   loginButton: {
     width: '100%',
@@ -199,6 +255,11 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.yellow,
     alignItems: 'center',
     marginTop: Spacing.sm,
+    minHeight: 52,
+    justifyContent: 'center',
+  },
+  loginButtonDisabled: {
+    opacity: 0.7,
   },
   loginButtonText: {
     color: Colors.navy,
