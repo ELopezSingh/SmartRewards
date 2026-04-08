@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,16 +9,16 @@ import {
   ScrollView,
   StatusBar,
   Platform,
+  Modal,
 } from 'react-native';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
 import { Colors, FontSize, FontWeight, Radius, Spacing } from '@/constants/theme';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
-type ScanMode = 'camera' | 'manual' | null;
 type FeedbackType = 'success' | 'error' | null;
 
-// ─── Datos mock (reemplazar con llamadas al backend) ──────────────────────────
+// ─── Datos mock (reemplazar con contexto de autenticación del backend) ─────────
 const MOCK_USER = {
   nombre: 'Emiliano',
   balance: 3_450,
@@ -28,18 +28,13 @@ const MOCK_USER = {
 
 // ─── Subcomponentes ───────────────────────────────────────────────────────────
 
-/** Tarjeta de feedback: éxito o error al canjear */
+/** Banner de feedback al canjear */
 function FeedbackBanner({ type }: { type: FeedbackType }) {
   if (!type) return null;
-
   const isSuccess = type === 'success';
   return (
     <View style={[styles.feedbackBanner, isSuccess ? styles.feedbackSuccess : styles.feedbackError]}>
-      <Ionicons
-        name={isSuccess ? 'checkmark-circle' : 'close-circle'}
-        size={24}
-        color={Colors.white}
-      />
+      <Ionicons name={isSuccess ? 'checkmark-circle' : 'close-circle'} size={24} color={Colors.white} />
       <View style={styles.feedbackTextContainer}>
         <Text style={styles.feedbackTitle}>
           {isSuccess ? '¡Código Canjeado!' : 'Código Inválido'}
@@ -52,51 +47,12 @@ function FeedbackBanner({ type }: { type: FeedbackType }) {
   );
 }
 
-/** Botón de opción de canjeo (amarillo o borde navy) */
-function ScanOptionButton({
-  icon,
-  title,
-  subtitle,
-  variant = 'primary',
-  onPress,
-}: {
-  icon: keyof typeof Ionicons.glyphMap;
-  title: string;
-  subtitle: string;
-  variant?: 'primary' | 'secondary';
-  onPress: () => void;
-}) {
-  const isPrimary = variant === 'primary';
-  return (
-    <TouchableOpacity
-      style={[styles.scanOptionButton, isPrimary ? styles.scanOptionPrimary : styles.scanOptionSecondary]}
-      onPress={onPress}
-      activeOpacity={0.85}
-    >
-      <View style={styles.scanOptionLeft}>
-        <View style={styles.scanOptionIconWrap}>
-          <Ionicons name={icon} size={24} color={Colors.yellow} />
-        </View>
-        <View>
-          <Text style={[styles.scanOptionTitle, !isPrimary && styles.scanOptionTitleSecondary]}>
-            {title}
-          </Text>
-          <Text style={[styles.scanOptionSubtitle, !isPrimary && styles.scanOptionSubtitleSecondary]}>
-            {subtitle}
-          </Text>
-        </View>
-      </View>
-      <Ionicons
-        name="chevron-forward"
-        size={20}
-        color={isPrimary ? Colors.navy : Colors.navyOpacity70}
-      />
-    </TouchableOpacity>
-  );
-}
-
 /** Tarjeta de estadística */
-function StatCard({ label, value, valueColor = Colors.navy }: { label: string; value: string; valueColor?: string }) {
+function StatCard({ label, value, valueColor = Colors.navy }: {
+  label: string;
+  value: string;
+  valueColor?: string;
+}) {
   return (
     <View style={styles.statCard}>
       <Text style={styles.statLabel}>{label}</Text>
@@ -107,31 +63,38 @@ function StatCard({ label, value, valueColor = Colors.navy }: { label: string; v
 
 // ─── Pantalla principal ───────────────────────────────────────────────────────
 export default function HomeScreen() {
-  const router = useRouter();
-  const [scanMode, setScanMode] = useState<ScanMode>(null);
-  const [manualCode, setManualCode] = useState('');
+  const [permission, requestPermission] = useCameraPermissions();
+  const [scanned, setScanned] = useState(false);
   const [feedback, setFeedback] = useState<FeedbackType>(null);
+  const [showManualModal, setShowManualModal] = useState(false);
+  const [manualCode, setManualCode] = useState('');
 
-  /** Simula validación del código — reemplazar con llamada al backend */
+  // Solicitar permisos al montar la pantalla
+  useEffect(() => {
+    if (permission && !permission.granted && permission.canAskAgain) {
+      requestPermission();
+    }
+  }, []);
+
   const processCode = (code: string) => {
-    setScanMode(null);
-    setManualCode('');
+    setScanned(true);
     const isValid = code.trim().length > 0;
     setFeedback(isValid ? 'success' : 'error');
-    setTimeout(() => setFeedback(null), 3000);
+    setTimeout(() => {
+      setFeedback(null);
+      setScanned(false); // Resetea para permitir otro escaneo
+    }, 3000);
   };
 
-  const handleOpenCamera = () => {
-    // Navega al modal de QR (app/modal.tsx) que usa expo-camera
-    router.push('/modal');
+  const handleBarCodeScanned = ({ data }: { data: string }) => {
+    if (scanned) return;
+    processCode(data);
   };
 
   const handleManualSubmit = () => {
-    if (manualCode.trim()) processCode(manualCode);
-  };
-
-  const handleCancel = () => {
-    setScanMode(null);
+    if (!manualCode.trim()) return;
+    setShowManualModal(false);
+    processCode(manualCode);
     setManualCode('');
   };
 
@@ -141,9 +104,9 @@ export default function HomeScreen() {
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
+
         {/* ── Header navy ──────────────────────────────────────── */}
         <View style={styles.header}>
           <Text style={styles.headerGreeting}>Hola, {MOCK_USER.nombre}</Text>
@@ -162,66 +125,64 @@ export default function HomeScreen() {
           {/* Feedback banner */}
           <FeedbackBanner type={feedback} />
 
-          {/* ── Estado: opciones principales ─────────────────────── */}
-          {!scanMode && (
-            <>
-              <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>Canjear Puntos</Text>
-                <Text style={styles.sectionSubtitle}>
-                  Escanea el código QR de tu recibo
-                </Text>
-              </View>
+          {/* ── Sección cámara ───────────────────────────────────── */}
+          <View style={styles.scanSection}>
+            <Text style={styles.scanTitle}>Canjear Puntos</Text>
+            <Text style={styles.scanSubtitle}>Apunta al código QR de tu recibo</Text>
 
-              <View style={styles.scanOptions}>
-                <ScanOptionButton
-                  icon="qr-code-outline"
-                  title="Escanear QR"
-                  subtitle="Usar la cámara"
-                  variant="primary"
-                  onPress={handleOpenCamera}
-                />
-                <ScanOptionButton
-                  icon="keypad-outline"
-                  title="Ingresar Código"
-                  subtitle="Escribir manualmente"
-                  variant="secondary"
-                  onPress={() => setScanMode('manual')}
-                />
-              </View>
-            </>
-          )}
+            {/* Ventana de cámara */}
+            <View style={styles.cameraWrapper}>
+              {permission?.granted ? (
+                <>
+                  <CameraView
+                    style={styles.camera}
+                    facing="back"
+                    onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
+                    barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
+                  />
 
-          {/* ── Estado: ingreso manual ───────────────────────────── */}
-          {scanMode === 'manual' && (
-            <View style={styles.manualContainer}>
-              <Text style={styles.label}>Código del Recibo</Text>
-              <TextInput
-                style={styles.manualInput}
-                value={manualCode}
-                onChangeText={v => setManualCode(v.toUpperCase())}
-                placeholder="Ej: SGMX123456789"
-                placeholderTextColor={Colors.mutedForeground}
-                autoCapitalize="characters"
-                autoCorrect={false}
-                returnKeyType="done"
-                onSubmitEditing={handleManualSubmit}
-              />
-              <TouchableOpacity
-                style={[
-                  styles.actionButton,
-                  manualCode.trim() ? styles.actionButtonActive : styles.actionButtonDisabled,
-                ]}
-                onPress={handleManualSubmit}
-                disabled={!manualCode.trim()}
-                activeOpacity={0.85}
-              >
-                <Text style={styles.actionButtonText}>Canjear Código</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.cancelButton} onPress={handleCancel} activeOpacity={0.7}>
-                <Text style={styles.cancelButtonText}>Cancelar</Text>
-              </TouchableOpacity>
+                  {/* Esquinas del marco QR */}
+                  <View style={styles.cornerTL} />
+                  <View style={styles.cornerTR} />
+                  <View style={styles.cornerBL} />
+                  <View style={styles.cornerBR} />
+
+                  {/* Overlay de éxito al escanear */}
+                  {scanned && (
+                    <View style={styles.scannedOverlay}>
+                      <Ionicons name="checkmark-circle" size={52} color={Colors.yellow} />
+                      <Text style={styles.scannedOverlayText}>¡Escaneado!</Text>
+                    </View>
+                  )}
+                </>
+              ) : (
+                // Sin permisos de cámara
+                <View style={styles.noPermissionBox}>
+                  <Ionicons name="camera-outline" size={40} color={Colors.mutedForeground} />
+                  <Text style={styles.noPermissionText}>
+                    Se necesita acceso a la cámara
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.permissionButton}
+                    onPress={requestPermission}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={styles.permissionButtonText}>Permitir acceso</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
-          )}
+
+            {/* Botón ingreso manual */}
+            <TouchableOpacity
+              style={styles.manualButton}
+              onPress={() => setShowManualModal(true)}
+              activeOpacity={0.75}
+            >
+              <Ionicons name="keypad-outline" size={18} color={Colors.navy} />
+              <Text style={styles.manualButtonText}>Ingresar código manualmente</Text>
+            </TouchableOpacity>
+          </View>
 
           {/* ── Tarjetas de estadísticas ─────────────────────────── */}
           <View style={styles.statsContainer}>
@@ -238,11 +199,63 @@ export default function HomeScreen() {
 
         </View>
       </ScrollView>
+
+      {/* ── Modal de ingreso manual ───────────────────────────────── */}
+      <Modal
+        visible={showManualModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowManualModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+
+            {/* Header del modal */}
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Ingresar Código</Text>
+              <TouchableOpacity onPress={() => setShowManualModal(false)} activeOpacity={0.7}>
+                <Ionicons name="close" size={24} color={Colors.navy} />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.modalLabel}>Código del Recibo</Text>
+            <TextInput
+              style={styles.modalInput}
+              value={manualCode}
+              onChangeText={v => setManualCode(v.toUpperCase())}
+              placeholder="Ej: SGMX123456789"
+              placeholderTextColor={Colors.mutedForeground}
+              autoCapitalize="characters"
+              autoCorrect={false}
+              returnKeyType="done"
+              onSubmitEditing={handleManualSubmit}
+              autoFocus
+            />
+
+            <TouchableOpacity
+              style={[
+                styles.modalButton,
+                !manualCode.trim() && styles.modalButtonDisabled,
+              ]}
+              onPress={handleManualSubmit}
+              disabled={!manualCode.trim()}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.modalButtonText}>Canjear Código</Text>
+            </TouchableOpacity>
+
+          </View>
+        </View>
+      </Modal>
+
     </SafeAreaView>
   );
 }
 
 // ─── Estilos ──────────────────────────────────────────────────────────────────
+const CORNER_SIZE = 24;
+const CORNER_THICKNESS = 3;
+
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
@@ -323,115 +336,115 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 
-  // ── Sección canjear ─────────────────────────────────────
-  sectionHeader: { alignItems: 'center', gap: Spacing.xs },
-  sectionTitle: {
+  // ── Sección de escáner ──────────────────────────────────
+  scanSection: {
+    gap: Spacing.lg,
+    alignItems: 'center',
+  },
+  scanTitle: {
     fontSize: FontSize.lg,
     fontWeight: FontWeight.semibold,
     color: Colors.navy,
   },
-  sectionSubtitle: {
+  scanSubtitle: {
     fontSize: FontSize.sm,
     color: Colors.navyOpacity70,
+    marginTop: -Spacing.sm,
   },
 
-  // ── Botones de opción ───────────────────────────────────
-  scanOptions: { gap: Spacing.md },
-  scanOptionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: Spacing.xl,
+  // ── Ventana de cámara ───────────────────────────────────
+  cameraWrapper: {
+    width: '100%',
+    height: 260,
     borderRadius: Radius.xl,
+    overflow: 'hidden',
+    backgroundColor: Colors.muted,
+    position: 'relative',
+    // Borde amarillo
+    borderWidth: 3,
+    borderColor: Colors.yellow,
   },
-  scanOptionPrimary: {
-    backgroundColor: Colors.yellow,
-    shadowColor: Colors.yellow,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 10,
-    elevation: 5,
+  camera: {
+    flex: 1,
   },
-  scanOptionSecondary: {
-    backgroundColor: Colors.white,
-    borderWidth: 2,
-    borderColor: Colors.navy,
-    shadowColor: Colors.navy,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 2,
+
+  // ── Esquinas del marco ──────────────────────────────────
+  cornerTL: {
+    position: 'absolute', top: 12, left: 12,
+    width: CORNER_SIZE, height: CORNER_SIZE,
+    borderTopWidth: CORNER_THICKNESS, borderLeftWidth: CORNER_THICKNESS,
+    borderColor: Colors.white, borderTopLeftRadius: 4,
   },
-  scanOptionLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.lg,
+  cornerTR: {
+    position: 'absolute', top: 12, right: 12,
+    width: CORNER_SIZE, height: CORNER_SIZE,
+    borderTopWidth: CORNER_THICKNESS, borderRightWidth: CORNER_THICKNESS,
+    borderColor: Colors.white, borderTopRightRadius: 4,
   },
-  scanOptionIconWrap: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: Colors.navy,
+  cornerBL: {
+    position: 'absolute', bottom: 12, left: 12,
+    width: CORNER_SIZE, height: CORNER_SIZE,
+    borderBottomWidth: CORNER_THICKNESS, borderLeftWidth: CORNER_THICKNESS,
+    borderColor: Colors.white, borderBottomLeftRadius: 4,
+  },
+  cornerBR: {
+    position: 'absolute', bottom: 12, right: 12,
+    width: CORNER_SIZE, height: CORNER_SIZE,
+    borderBottomWidth: CORNER_THICKNESS, borderRightWidth: CORNER_THICKNESS,
+    borderColor: Colors.white, borderBottomRightRadius: 4,
+  },
+
+  // ── Overlay al escanear ─────────────────────────────────
+  scannedOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.6)',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: Spacing.sm,
   },
-  scanOptionTitle: {
+  scannedOverlayText: {
+    color: Colors.white,
     fontSize: FontSize.lg,
     fontWeight: FontWeight.semibold,
-    color: Colors.navy,
   },
-  scanOptionTitleSecondary: { color: Colors.navy },
-  scanOptionSubtitle: {
-    fontSize: FontSize.sm,
-    color: Colors.navyOpacity70,
-    marginTop: 2,
-  },
-  scanOptionSubtitleSecondary: { color: Colors.navyOpacity70 },
 
-  // ── Ingreso manual ──────────────────────────────────────
-  manualContainer: { gap: Spacing.md },
-  label: {
+  // ── Sin permisos ────────────────────────────────────────
+  noPermissionBox: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.md,
+    padding: Spacing['2xl'],
+  },
+  noPermissionText: {
     fontSize: FontSize.sm,
-    fontWeight: FontWeight.medium,
-    color: Colors.navy,
+    color: Colors.mutedForeground,
+    textAlign: 'center',
   },
-  manualInput: {
-    width: '100%',
-    paddingHorizontal: Spacing.lg,
+  permissionButton: {
     paddingVertical: Spacing.md,
-    borderRadius: Radius.md,
-    borderWidth: 2,
-    borderColor: Colors.navy,
+    paddingHorizontal: Spacing.xl,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.yellow,
+  },
+  permissionButtonText: {
     color: Colors.navy,
-    fontSize: FontSize.lg,
+    fontWeight: FontWeight.semibold,
+    fontSize: FontSize.sm,
+  },
+
+  // ── Botón ingreso manual ────────────────────────────────
+  manualButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    paddingVertical: Spacing.sm,
+  },
+  manualButtonText: {
+    fontSize: FontSize.sm,
+    color: Colors.navy,
+    textDecorationLine: 'underline',
     fontWeight: FontWeight.medium,
-    backgroundColor: Colors.white,
-    letterSpacing: 1,
-  },
-  actionButton: {
-    paddingVertical: Spacing.lg,
-    borderRadius: Radius.md,
-    alignItems: 'center',
-  },
-  actionButtonActive:   { backgroundColor: Colors.yellow },
-  actionButtonDisabled: { backgroundColor: Colors.muted },
-  actionButtonText: {
-    color: Colors.navy,
-    fontWeight: FontWeight.semibold,
-    fontSize: FontSize.base,
-  },
-  cancelButton: {
-    paddingVertical: Spacing.lg,
-    borderRadius: Radius.md,
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: Colors.navy,
-    backgroundColor: Colors.white,
-  },
-  cancelButtonText: {
-    color: Colors.navy,
-    fontWeight: FontWeight.semibold,
-    fontSize: FontSize.base,
   },
 
   // ── Estadísticas ────────────────────────────────────────
@@ -453,5 +466,62 @@ const styles = StyleSheet.create({
   statValue: {
     fontSize: FontSize.xl,
     fontWeight: FontWeight.bold,
+  },
+
+  // ── Modal ingreso manual ────────────────────────────────
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: Colors.white,
+    borderTopLeftRadius: Radius.xl,
+    borderTopRightRadius: Radius.xl,
+    padding: Spacing['2xl'],
+    paddingBottom: Platform.OS === 'ios' ? Spacing['5xl'] : Spacing['2xl'],
+    gap: Spacing.lg,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  modalTitle: {
+    fontSize: FontSize.lg,
+    fontWeight: FontWeight.semibold,
+    color: Colors.navy,
+  },
+  modalLabel: {
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.medium,
+    color: Colors.navy,
+  },
+  modalInput: {
+    width: '100%',
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+    borderRadius: Radius.md,
+    borderWidth: 2,
+    borderColor: Colors.navy,
+    color: Colors.navy,
+    fontSize: FontSize.lg,
+    fontWeight: FontWeight.medium,
+    letterSpacing: 1,
+  },
+  modalButton: {
+    width: '100%',
+    paddingVertical: Spacing.lg,
+    borderRadius: Radius.md,
+    backgroundColor: Colors.yellow,
+    alignItems: 'center',
+  },
+  modalButtonDisabled: {
+    backgroundColor: Colors.muted,
+  },
+  modalButtonText: {
+    color: Colors.navy,
+    fontWeight: FontWeight.semibold,
+    fontSize: FontSize.base,
   },
 });
