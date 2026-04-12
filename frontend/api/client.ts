@@ -7,7 +7,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // Ejemplo con dispositivo físico: 'http://192.168.1.100:3000/api'
 // Ejemplo con emulador Android:   'http://10.0.2.2:3000/api'
 // Ejemplo con simulador iOS:      'http://localhost:3000/api'
-const API_BASE_URL = 'http://192.168.1.72:3000/api';
+const API_BASE_URL = 'https://smartrewards-production.up.railway.app/api';
 
 const TOKEN_KEY = 'smartrewards_token';
 
