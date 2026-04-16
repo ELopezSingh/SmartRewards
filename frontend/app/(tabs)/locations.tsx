@@ -22,8 +22,8 @@ import { obtenerSucursales, Sucursal } from '@/api/sucursales';
 type ViewMode = 'list' | 'map';
 
 const INITIAL_REGION = {
-  latitude: 19.4326,
-  longitude: -99.1332,
+  latitude: 24.808739402719453,
+  longitude: -107.39272867549276,
   latitudeDelta: 0.18,
   longitudeDelta: 0.18,
 };
