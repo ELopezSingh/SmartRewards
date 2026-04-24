@@ -17,12 +17,12 @@ import { Colors, FontSize, FontWeight, Radius, Spacing } from '@/constants/theme
 import { obtenerPerfil, logout } from '@/api/perfil';
 import { Usuario } from '@/api/auth';
 import PersonalInfoModal   from '@/components/profile/PersonalInfoModal';
-import PaymentMethodsModal from '@/components/profile/PaymentMethodsModal';
+//import PaymentMethodsModal from '@/components/profile/PaymentMethodsModal';
 import NotificationsModal  from '@/components/profile/NotificationsModal';
 import HelpSupportModal    from '@/components/profile/HelpSupportModal';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
-type ModalType = 'personal' | 'payment' | 'notifications' | 'help' | null;
+type ModalType = 'personal' | 'notifications' | 'help' | null;
 type IoniconsName = keyof typeof Ionicons.glyphMap;
 
 interface MenuItemConfig {
@@ -105,7 +105,6 @@ export default function ProfileScreen() {
 
   const menuItems: MenuItemConfig[] = [
     { icon: 'person-outline',        label: 'Información Personal', modal: 'personal'      },
-    { icon: 'card-outline',          label: 'Métodos de Pago',      modal: 'payment'       },
     { icon: 'notifications-outline', label: 'Notificaciones',       modal: 'notifications' },
     { icon: 'help-circle-outline',   label: 'Ayuda y Soporte',      modal: 'help'          },
   ];
@@ -205,10 +204,6 @@ export default function ProfileScreen() {
         visible={activeModal === 'personal'}
         onClose={() => setActiveModal(null)}
         usuario={usuario}
-      />
-      <PaymentMethodsModal
-        visible={activeModal === 'payment'}
-        onClose={() => setActiveModal(null)}
       />
       <NotificationsModal
         visible={activeModal === 'notifications'}

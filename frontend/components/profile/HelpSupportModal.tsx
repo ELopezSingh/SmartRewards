@@ -63,7 +63,6 @@ export default function HelpSupportModal({ visible, onClose }: Props) {
   const temasPopulares = [
     'Cómo usar mi código QR',
     'Administrar puntos de lealtad',
-    'Problemas con el pago',
     'Actualizar información de cuenta',
     'Reportar un problema',
   ];
